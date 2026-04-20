@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: ecommerce_mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: ecommerce_db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ecommerce-network
+
+  # FastAPI Application
+  fastapi:
+    build: .
+    container_name: ecommerce_fastapi
+    ports:
+      - "8000:8000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      MONGODB_URL: mongodb://admin:admin123@mongodb:27017/ecommerce_db?authSource=admin
+      SECRET_KEY: your-secret-key-change-in-production
+      DEBUG: "True"
+    volumes:
+      - ./backend:/app/backend  # For live reloading during development
+      - ./frontend:/app/frontend  # Frontend HTML files
+    networks:
+      - ecommerce-network
+    command: python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  mongodb_data:
+
+networks:
+  ecommerce-network:
+    driver: bridge
